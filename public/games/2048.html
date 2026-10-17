@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>2048</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .header {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .title {
+      font-size: 40px;
+      font-weight: 800;
+      color: #38bdf8;
+      line-height: 1;
+    }
+    .scores {
+      display: flex;
+      gap: 8px;
+    }
+    .score-box {
+      background: #1e293b;
+      padding: 6px 14px;
+      border-radius: 8px;
+      text-align: center;
+      border: 1px solid #334155;
+      min-width: 70px;
+    }
+    .score-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: #94a3b8;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .score-val {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+    .toolbar {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .desc {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    .btn {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #1d4ed8; }
+    #grid-container {
+      width: 100%;
+      max-width: 420px;
+      aspect-ratio: 1;
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+      gap: 12px;
+      position: relative;
+      border: 1px solid #334155;
+    }
+    .cell {
+      background: #0f172a;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 800;
+      transition: all 0.12s ease-in-out;
+    }
+    .cell-2 { background: #334155; color: #f8fafc; }
+    .cell-4 { background: #475569; color: #f8fafc; }
+    .cell-8 { background: #ea580c; color: #fff; }
+    .cell-16 { background: #f97316; color: #fff; }
+    .cell-32 { background: #ef4444; color: #fff; }
+    .cell-64 { background: #dc2626; color: #fff; }
+    .cell-128 { background: #eab308; color: #fff; font-size: 24px; box-shadow: 0 0 10px rgba(234,179,8,0.4); }
+    .cell-256 { background: #facc15; color: #1e293b; font-size: 24px; box-shadow: 0 0 12px rgba(250,204,21,0.5); }
+    .cell-518 { background: #10b981; color: #fff; font-size: 24px; box-shadow: 0 0 14px rgba(16,185,129,0.5); }
+    .cell-1024 { background: #06b6d4; color: #fff; font-size: 20px; box-shadow: 0 0 16px rgba(6,182,212,0.6); }
+    .cell-2048 { background: #8b5cf6; color: #fff; font-size: 20px; box-shadow: 0 0 20px rgba(139,92,246,0.8); }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 12px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      backdrop-filter: blur(4px);
+    }
+    .overlay.active { display: flex; }
+    .overlay-title { font-size: 32px; font-weight: 800; color: #38bdf8; }
+    .footer-tip {
+      margin-top: 14px;
+      font-size: 12px;
+      color: #64748b;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">2048</div>
+    <div class="scores">
+      <div class="score-box">
+        <div class="score-label">Score</div>
+        <div class="score-val" id="score">0</div>
+      </div>
+      <div class="score-box">
+        <div class="score-label">Best</div>
+        <div class="score-val" id="best">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="desc">Join numbers to get the <strong>2048</strong> tile!</div>
+    <button class="btn" id="new-game-btn">New Game</button>
+  </div>
+
+  <div id="grid-container">
+    <div class="overlay" id="game-overlay">
+      <div class="overlay-title" id="overlay-msg">Game Over!</div>
+      <button class="btn" id="overlay-restart-btn">Try Again</button>
+    </div>
+  </div>
+
+  <div class="footer-tip">Use Arrow Keys or Swipe on touch devices</div>
+
+  <script>
+    const SIZE = 4;
+    let board = [];
+    let score = 0;
+    let best = parseInt(localStorage.getItem('2048_best') || '0', 10);
+    document.getElementById('best').textContent = best;
+
+    const grid = document.getElementById('grid-container');
+    const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
+    const overlay = document.getElementById('game-overlay');
+    const overlayMsg = document.getElementById('overlay-msg');
+
+    function initBoard() {
+      board = Array(SIZE).fill(null).map(() => Array(SIZE).fill(0));
+      score = 0;
+      scoreEl.textContent = '0';
+      overlay.classList.remove('active');
+      renderCells();
+      spawnTile();
+      spawnTile();
+      render();
+    }
+
+    function renderCells() {
+      // Remove any existing cells except overlay
+      const cells = grid.querySelectorAll('.cell');
+      cells.forEach(c => c.remove());
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const div = document.createElement('div');
+          div.className = 'cell';
+          div.id = `cell-${r}-${c}`;
+          grid.appendChild(div);
+        }
+      }
+    }
+
+    function spawnTile() {
+      const empty = [];
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (board[r][c] === 0) empty.push({ r, c });
+        }
+      }
+      if (empty.length === 0) return;
+      const { r, c } = empty[Math.floor(Math.random() * empty.length)];
+      board[r][c] = Math.random() < 0.9 ? 2 : 4;
+    }
+
+    function render() {
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const val = board[r][c];
+          const el = document.getElementById(`cell-${r}-${c}`);
+          el.textContent = val > 0 ? val : '';
+          el.className = 'cell' + (val > 0 ? ` cell-${val > 2048 ? 2048 : val}` : '');
+        }
+      }
+      scoreEl.textContent = score;
+      if (score > best) {
+        best = score;
+        bestEl.textContent = best;
+        localStorage.setItem('2048_best', best);
+      }
+    }
+
+    function slide(row) {
+      let arr = row.filter(val => val);
+      for (let i = 0; i < arr.length - 1; i++) {
+        if (arr[i] === arr[i + 1]) {
+          arr[i] *= 2;
+          score += arr[i];
+          arr[i + 1] = 0;
+        }
+      }
+      arr = arr.filter(val => val);
+      while (arr.length < SIZE) {
+        arr.push(0);
+      }
+      return arr;
+    }
+
+    function rotate(matrix) {
+      return matrix[0].map((_, index) => matrix.map(row => row[index]).reverse());
+    }
+
+    function moveLeft() {
+      let changed = false;
+      for (let r = 0; r < SIZE; r++) {
+        const oldRow = [...board[r]];
+        const newRow = slide(board[r]);
+        board[r] = newRow;
+        if (oldRow.some((v, i) => v !== newRow[i])) changed = true;
+      }
+      return changed;
+    }
+
+    function moveRight() {
+      let changed = false;
+      for (let r = 0; r < SIZE; r++) {
+        const oldRow = [...board[r]];
+        let reversed = [...board[r]].reverse();
+        reversed = slide(reversed);
+        board[r] = reversed.reverse();
+        if (oldRow.some((v, i) => v !== board[r][i])) changed = true;
+      }
+      return changed;
+    }
+
+    function moveUp() {
+      board = rotate(rotate(rotate(board)));
+      const changed = moveLeft();
+      board = rotate(board);
+      return changed;
+    }
+
+    function moveDown() {
+      board = rotate(board);
+      const changed = moveLeft();
+      board = rotate(rotate(rotate(board)));
+      return changed;
+    }
+
+    function checkGameOver() {
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (board[r][c] === 0) return false;
+          if (c < SIZE - 1 && board[r][c] === board[r][c + 1]) return false;
+          if (r < SIZE - 1 && board[r][c] === board[r + 1][c]) return false;
+        }
+      }
+      return true;
+    }
+
+    function handleMove(dir) {
+      let moved = false;
+      if (dir === 'left') moved = moveLeft();
+      if (dir === 'right') moved = moveRight();
+      if (dir === 'up') moved = moveUp();
+      if (dir === 'down') moved = moveDown();
+
+      if (moved) {
+        spawnTile();
+        render();
+        if (checkGameOver()) {
+          overlayMsg.textContent = 'Game Over!';
+          overlay.classList.add('active');
+        }
+      }
+    }
+
+    window.addEventListener('keydown', e => {
+      if (['ArrowUp', 'KeyW'].includes(e.code)) { e.preventDefault(); handleMove('up'); }
+      if (['ArrowDown', 'KeyS'].includes(e.code)) { e.preventDefault(); handleMove('down'); }
+      if (['ArrowLeft', 'KeyA'].includes(e.code)) { e.preventDefault(); handleMove('left'); }
+      if (['ArrowRight', 'KeyD'].includes(e.code)) { e.preventDefault(); handleMove('right'); }
+    });
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+    grid.addEventListener('touchstart', e => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    grid.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) {
+        handleMove(dx > 0 ? 'right' : 'left');
+      } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 30) {
+        handleMove(dy > 0 ? 'down' : 'up');
+      }
+    }, { passive: true });
+
+    document.getElementById('new-game-btn').addEventListener('click', initBoard);
+    document.getElementById('overlay-restart-btn').addEventListener('click', initBoard);
+
+    initBoard();
+  </script>
+</body>
+</html>

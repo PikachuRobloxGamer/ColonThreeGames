@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Breakout DX</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: #090d16;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 12px;
+    }
+    .hud {
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .hud-stat {
+      font-size: 13px;
+      font-weight: 700;
+      color: #94a3b8;
+    }
+    .hud-val { color: #38bdf8; font-size: 16px; }
+    .game-wrap {
+      position: relative;
+      border: 2px solid #38bdf8;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+      background: #0f172a;
+    }
+    canvas { display: block; cursor: crosshair; }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      backdrop-filter: blur(2px);
+    }
+    .overlay.hidden { display: none; }
+    .title { font-size: 28px; font-weight: 800; color: #38bdf8; }
+    .btn {
+      background: #0284c7;
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .btn:hover { background: #0369a1; }
+    .tip {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <div class="hud-stat">SCORE: <span class="hud-val" id="score">0</span></div>
+    <div class="hud-stat">LIVES: <span class="hud-val" id="lives">❤❤❤</span></div>
+    <div class="hud-stat">LEVEL: <span class="hud-val" id="level">1</span></div>
+  </div>
+
+  <div class="game-wrap">
+    <canvas id="canvas" width="440" height="420"></canvas>
+    <div class="overlay" id="overlay">
+      <div class="title" id="overlay-msg">BREAKOUT DX</div>
+      <button class="btn" id="start-btn">Start Game</button>
+    </div>
+  </div>
+
+  <div class="tip">Move Mouse or Touch/Drag to control the paddle</div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const livesEl = document.getElementById('lives');
+    const levelEl = document.getElementById('level');
+    const overlay = document.getElementById('overlay');
+    const overlayMsg = document.getElementById('overlay-msg');
+    const startBtn = document.getElementById('start-btn');
+
+    let paddle = { w: 84, h: 12, x: 178, y: 390, speed: 7 };
+    let ball = { x: 220, y: 300, dx: 3.5, dy: -3.5, radius: 6 };
+    let bricks = [];
+    let score = 0;
+    let lives = 3;
+    let level = 1;
+    let isPlaying = false;
+    let animId = null;
+
+    const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4'];
+
+    function createBricks() {
+      bricks = [];
+      const rows = 5;
+      const cols = 8;
+      const w = 48;
+      const h = 16;
+      const padding = 6;
+      const offsetTop = 40;
+      const offsetLeft = (canvas.width - (cols * (w + padding) - padding)) / 2;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          bricks.push({
+            x: offsetLeft + c * (w + padding),
+            y: offsetTop + r * (h + padding),
+            w, h,
+            color: COLORS[r % COLORS.length],
+            points: (rows - r) * 10,
+            active: true
+          });
+        }
+      }
+    }
+
+    function initGame() {
+      score = 0;
+      lives = 3;
+      level = 1;
+      scoreEl.textContent = score;
+      livesEl.textContent = '❤❤❤';
+      levelEl.textContent = level;
+      createBricks();
+      resetBall();
+      overlay.classList.add('hidden');
+      isPlaying = true;
+      if (animId) cancelAnimationFrame(animId);
+      animId = requestAnimationFrame(loop);
+    }
+
+    function resetBall() {
+      paddle.x = (canvas.width - paddle.w) / 2;
+      ball.x = canvas.width / 2;
+      ball.y = paddle.y - 15;
+      ball.dx = (Math.random() > 0.5 ? 3.5 : -3.5);
+      ball.dy = -3.5;
+    }
+
+    function loop() {
+      update();
+      draw();
+      if (isPlaying) animId = requestAnimationFrame(loop);
+    }
+
+    function update() {
+      ball.x += ball.dx;
+      ball.y += ball.dy;
+
+      // Wall bounce
+      if (ball.x - ball.radius <= 0 || ball.x + ball.radius >= canvas.width) {
+        ball.dx *= -1;
+      }
+      if (ball.y - ball.radius <= 0) {
+        ball.dy *= -1;
+      }
+
+      // Bottom death
+      if (ball.y + ball.radius >= canvas.height) {
+        lives--;
+        livesEl.textContent = '❤'.repeat(Math.max(0, lives));
+        if (lives <= 0) {
+          gameOver(false);
+          return;
+        } else {
+          resetBall();
+        }
+      }
+
+      // Paddle bounce
+      if (
+        ball.y + ball.radius >= paddle.y &&
+        ball.y - ball.radius <= paddle.y + paddle.h &&
+        ball.x >= paddle.x &&
+        ball.x <= paddle.x + paddle.w
+      ) {
+        ball.dy = -Math.abs(ball.dy);
+        const hitPoint = (ball.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2);
+        ball.dx = hitPoint * 4.5;
+      }
+
+      // Brick collision
+      let activeRemaining = 0;
+      bricks.forEach(b => {
+        if (!b.active) return;
+        activeRemaining++;
+        if (
+          ball.x + ball.radius > b.x &&
+          ball.x - ball.radius < b.x + b.w &&
+          ball.y + ball.radius > b.y &&
+          ball.y - ball.radius < b.y + b.h
+        ) {
+          b.active = false;
+          ball.dy *= -1;
+          score += b.points;
+          scoreEl.textContent = score;
+        }
+      });
+
+      if (activeRemaining === 0) {
+        level++;
+        levelEl.textContent = level;
+        createBricks();
+        resetBall();
+        ball.dx *= 1.1;
+        ball.dy *= 1.1;
+      }
+    }
+
+    function draw() {
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Paddle
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.roundRect(paddle.x, paddle.y, paddle.w, paddle.h, 6);
+      ctx.fill();
+
+      // Ball
+      ctx.fillStyle = '#f8fafc';
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Bricks
+      bricks.forEach(b => {
+        if (!b.active) return;
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.roundRect(b.x, b.y, b.w, b.h, 4);
+        ctx.fill();
+      });
+    }
+
+    function gameOver(won) {
+      isPlaying = false;
+      overlayMsg.textContent = won ? 'YOU WIN!' : 'GAME OVER';
+      startBtn.textContent = 'PLAY AGAIN';
+      overlay.classList.remove('hidden');
+    }
+
+    function movePaddle(clientX) {
+      const rect = canvas.getBoundingClientRect();
+      const relativeX = clientX - rect.left;
+      paddle.x = Math.max(0, Math.min(canvas.width - paddle.w, relativeX - paddle.w / 2));
+    }
+
+    canvas.addEventListener('mousemove', e => movePaddle(e.clientX));
+    canvas.addEventListener('touchmove', e => {
+      e.preventDefault();
+      movePaddle(e.touches[0].clientX);
+    }, { passive: false });
+
+    window.addEventListener('keydown', e => {
+      if (['ArrowLeft', 'KeyA'].includes(e.code)) {
+        paddle.x = Math.max(0, paddle.x - 24);
+      } else if (['ArrowRight', 'KeyD'].includes(e.code)) {
+        paddle.x = Math.min(canvas.width - paddle.w, paddle.x + 24);
+      }
+    });
+
+    startBtn.addEventListener('click', initGame);
+    draw();
+  </script>
+</body>
+</html>

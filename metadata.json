@@ -1,0 +1,6 @@
+{
+  "name": "ArcadeVault - Unblocked Games",
+  "description": "Fast, ad-free unblocked games portal with classic arcade, action, and puzzle games stored as iframe configurations in JSON.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

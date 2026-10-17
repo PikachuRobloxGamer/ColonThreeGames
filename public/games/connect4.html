@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Connect Four</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: #090d16;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 12px;
+    }
+    .hud {
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .status {
+      font-size: 15px;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+    .btn {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .board {
+      background: #1e3a8a;
+      padding: 12px;
+      border-radius: 16px;
+      display: grid;
+      grid-template-columns: repeat(7, 46px);
+      grid-template-rows: repeat(6, 46px);
+      gap: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.2);
+    }
+    .slot {
+      width: 46px;
+      height: 46px;
+      background: #0f172a;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: inset 0 3px 6px rgba(0,0,0,0.6);
+      transition: background 0.15s;
+    }
+    .slot.p1 {
+      background: #ef4444;
+      box-shadow: inset 0 -3px 4px rgba(0,0,0,0.3), 0 0 10px rgba(239, 68, 68, 0.6);
+    }
+    .slot.p2 {
+      background: #facc15;
+      box-shadow: inset 0 -3px 4px rgba(0,0,0,0.3), 0 0 10px rgba(250, 204, 21, 0.6);
+    }
+    .slot:hover:not(.p1):not(.p2) {
+      background: #1e293b;
+    }
+    .tip {
+      margin-top: 14px;
+      font-size: 12px;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <div class="status" id="status-text">Your Turn (Red)</div>
+    <button class="btn" id="restart-btn">Restart</button>
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <div class="tip">Click any column to drop your chip. Connect 4 in a row to win!</div>
+
+  <script>
+    const ROWS = 6;
+    const COLS = 7;
+    let grid = [];
+    let currentPlayer = 1; // 1 = Human (Red), 2 = AI (Yellow)
+    let gameOver = false;
+
+    const boardEl = document.getElementById('board');
+    const statusText = document.getElementById('status-text');
+    const restartBtn = document.getElementById('restart-btn');
+
+    function init() {
+      grid = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+      currentPlayer = 1;
+      gameOver = false;
+      statusText.textContent = 'Your Turn (Red)';
+      statusText.style.color = '#ef4444';
+
+      boardEl.innerHTML = '';
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const slot = document.createElement('div');
+          slot.className = 'slot';
+          slot.dataset.col = c;
+          slot.addEventListener('click', () => handleColClick(c));
+          boardEl.appendChild(slot);
+        }
+      }
+    }
+
+    function render() {
+      const slots = boardEl.querySelectorAll('.slot');
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const idx = r * COLS + c;
+          const val = grid[r][c];
+          slots[idx].className = 'slot' + (val === 1 ? ' p1' : val === 2 ? ' p2' : '');
+        }
+      }
+    }
+
+    function dropChip(col, player) {
+      for (let r = ROWS - 1; r >= 0; r--) {
+        if (grid[r][col] === 0) {
+          grid[r][col] = player;
+          return r;
+        }
+      }
+      return -1;
+    }
+
+    function checkWin(r, c, p) {
+      const directions = [
+        [[0, 1], [0, -1]],   // Horizontal
+        [[1, 0], [-1, 0]],   // Vertical
+        [[1, 1], [-1, -1]],  // Diagonal \
+        [[1, -1], [-1, 1]]   // Diagonal /
+      ];
+
+      for (let [d1, d2] of directions) {
+        let count = 1;
+        for (let [dr, dc] of [d1, d2]) {
+          let currR = r + dr;
+          let currC = c + dc;
+          while (currR >= 0 && currR < ROWS && currC >= 0 && currC < COLS && grid[currR][currC] === p) {
+            count++;
+            currR += dr;
+            currC += dc;
+          }
+        }
+        if (count >= 4) return true;
+      }
+      return false;
+    }
+
+    function isBoardFull() {
+      return grid[0].every(cell => cell !== 0);
+    }
+
+    function handleColClick(col) {
+      if (gameOver || currentPlayer !== 1) return;
+      const row = dropChip(col, 1);
+      if (row === -1) return; // Column full
+
+      render();
+
+      if (checkWin(row, col, 1)) {
+        gameOver = true;
+        statusText.textContent = 'YOU WIN! 🎉';
+        statusText.style.color = '#22c55e';
+        return;
+      }
+
+      if (isBoardFull()) {
+        gameOver = true;
+        statusText.textContent = 'Draw Game!';
+        statusText.style.color = '#94a3b8';
+        return;
+      }
+
+      currentPlayer = 2;
+      statusText.textContent = 'AI is thinking...';
+      statusText.style.color = '#facc15';
+
+      setTimeout(aiMove, 350);
+    }
+
+    function aiMove() {
+      if (gameOver) return;
+
+      // 1. Check if AI can win in 1 move
+      for (let c = 0; c < COLS; c++) {
+        const r = simulateDrop(c, 2);
+        if (r !== -1) {
+          if (checkWin(r, c, 2)) {
+            grid[r][c] = 0;
+            executeAiDrop(c);
+            return;
+          }
+          grid[r][c] = 0;
+        }
+      }
+
+      // 2. Block player from winning
+      for (let c = 0; c < COLS; c++) {
+        const r = simulateDrop(c, 1);
+        if (r !== -1) {
+          if (checkWin(r, c, 1)) {
+            grid[r][c] = 0;
+            executeAiDrop(c);
+            return;
+          }
+          grid[r][c] = 0;
+        }
+      }
+
+      // 3. Prefer center column or valid random
+      const preferred = [3, 2, 4, 1, 5, 0, 6];
+      for (let c of preferred) {
+        if (grid[0][c] === 0) {
+          executeAiDrop(c);
+          return;
+        }
+      }
+    }
+
+    function simulateDrop(col, player) {
+      for (let r = ROWS - 1; r >= 0; r--) {
+        if (grid[r][col] === 0) {
+          grid[r][col] = player;
+          return r;
+        }
+      }
+      return -1;
+    }
+
+    function executeAiDrop(c) {
+      const row = dropChip(c, 2);
+      render();
+
+      if (checkWin(row, c, 2)) {
+        gameOver = true;
+        statusText.textContent = 'AI Wins!';
+        statusText.style.color = '#facc15';
+        return;
+      }
+
+      if (isBoardFull()) {
+        gameOver = true;
+        statusText.textContent = 'Draw Game!';
+        return;
+      }
+
+      currentPlayer = 1;
+      statusText.textContent = 'Your Turn (Red)';
+      statusText.style.color = '#ef4444';
+    }
+
+    restartBtn.addEventListener('click', init);
+    init();
+  </script>
+</body>
+</html>
