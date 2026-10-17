@@ -1,0 +1,28 @@
+{
+  "proxies": [
+    {
+      "id": "tung-tung",
+      "title": "Tung Tung",
+      "category": "Proxy",
+      "thumbnail": "images/tung-tung.png",
+      "description": "",
+      "url": "https://raphael.baby"
+    },
+    {
+      "id": "cherri",
+      "title": "Cherri",
+      "category": "Proxy",
+      "thumbnail": "images/cherri.png",
+      "description": "",
+      "url": "https://cherrion.top/"
+    },
+    {
+      "id": "fern",
+      "title": "Fern",
+      "category": "Proxy",
+      "thumbnail": "images/fern.png",
+      "description": "",
+      "url": "https://s3.amazonaws.com/deaganfern/index.html"
+    }
+  ]
+}

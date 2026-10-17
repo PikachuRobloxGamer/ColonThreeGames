@@ -3,19 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Game Hub</title>
+  <title>MaxwellGames</title>
+  <link rel="icon" type="image/png" href="maxwell.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Background -->
+  <div class="bg-tint" aria-hidden="true"></div>
+  <canvas id="particles" aria-hidden="true"></canvas>
+
   <header class="topbar">
-    <a href="#" class="logo" id="homeLink">🎮 Game Hub</a>
+    <a href="#" class="logo" id="homeLink"><img src="maxwell.png" alt="Maxwell the cat" class="logo-img">MaxwellGames</a>
+    <nav class="tabs">
+      <button class="tab active" data-tab="games">Games</button>
+      <button class="tab" data-tab="proxies">Proxies</button>
+    </nav>
     <input type="search" id="search" placeholder="Search games..." autocomplete="off">
   </header>
 
   <!-- Library view -->
   <main id="libraryView">
     <nav id="categories" class="categories"></nav>
-    <p id="status" class="status">Loading games...</p>
+    <p id="status" class="status">Loading...</p>
     <section id="grid" class="grid"></section>
   </main>
 
@@ -30,12 +39,12 @@
       </div>
     </div>
     <div class="frame-wrap" id="frameWrap">
-      <iframe id="gameFrame" title="Game" allow="fullscreen; autoplay; gamepad" allowfullscreen></iframe>
+      <iframe id="gameFrame" title="Game" allow="fullscreen; autoplay; gamepad; pointer-lock" allowfullscreen></iframe>
     </div>
     <p id="playerDesc" class="player-desc"></p>
   </main>
 
-  <footer class="footer">Game Hub</footer>
+  <footer class="footer">MaxwellGames</footer>
 
   <script src="script.js"></script>
 </body>
