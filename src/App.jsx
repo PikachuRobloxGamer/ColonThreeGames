@@ -55,9 +55,9 @@ export default function App() {
     localStorage.setItem('arcadevault_favs', JSON.stringify(favorites));
   }, [favorites]);
 
-  // Also attempt fetch from /games.json on first load if default
+  // Also attempt fetch from ./games.json on first load if default
   useEffect(() => {
-    fetch('/games.json')
+    fetch('./games.json')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
