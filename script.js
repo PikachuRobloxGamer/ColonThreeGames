@@ -44,12 +44,83 @@ async function loadTab(name) {
 }
 
 async function loadAll() {
-  await Promise.all(Object.keys(TABS).map(loadTab));
+  await Promise.all([...Object.keys(TABS).map(loadTab), loadSounds()]);
+  if (location.hash === "#sounds") return switchTab("sounds");
   if (!openFromHash()) switchTab(location.hash === "#proxies" ? "proxies" : "games");
+}
+
+// ===== Soundboard (Myinstants embeds) =====
+let sounds = [], soundCat = "All";
+const soundView = $("soundView");
+
+async function loadSounds() {
+  try {
+    const res = await fetch("sounds.json", { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    sounds = data.sounds || [];
+  } catch (err) {
+    $("soundStatus").textContent = "Couldn't load sounds.json.";
+    console.error(err);
+  }
+}
+
+function renderSoundCats() {
+  const el = $("soundCats");
+  const cats = ["All", ...new Set(sounds.map((s) => s.category || "Other"))];
+  el.innerHTML = "";
+  cats.forEach((cat) => {
+    const btn = document.createElement("button");
+    btn.className = "chip" + (cat === soundCat ? " active" : "");
+    btn.textContent = cat === "Cats" ? "🐱 Cats" : cat;
+    btn.onclick = () => { soundCat = cat; renderSoundCats(); renderSounds(); };
+    el.appendChild(btn);
+  });
+}
+
+function renderSounds() {
+  const q = searchEl.value.trim().toLowerCase();
+  const list = sounds.filter((s) =>
+    (soundCat === "All" || (s.category || "Other") === soundCat) &&
+    (!q || s.title.toLowerCase().includes(q)));
+  $("soundStatus").textContent = list.length ? `${list.length} sound${list.length === 1 ? "" : "s"}` : "No sounds found.";
+  const gridEl = $("soundGrid");
+  gridEl.innerHTML = "";
+  list.forEach((s) => {
+    const box = document.createElement("div");
+    box.className = "sound";
+    const f = document.createElement("iframe");
+    f.src = `https://www.myinstants.com/instant/${encodeURIComponent(s.myinstants)}/embed/`;
+    f.title = s.title;
+    f.loading = "lazy";
+    f.scrolling = "no";
+    const name = document.createElement("div");
+    name.className = "sound-name";
+    name.textContent = s.title;
+    box.append(f, name);
+    gridEl.appendChild(box);
+  });
 }
 
 function switchTab(name) {
   currentTab = name;
+  window.dispatchEvent(new CustomEvent("mg:tab", { detail: name }));
+  if (name === "sounds") {
+    searchEl.value = "";
+    searchEl.placeholder = "Search sounds...";
+    document.querySelectorAll(".tab").forEach((t) =>
+      t.classList.toggle("active", t.dataset.tab === name));
+    if (!playerView.classList.contains("hidden")) frame.src = "about:blank";
+    playerView.classList.add("hidden");
+    libraryView.classList.add("hidden");
+    soundView.classList.remove("hidden");
+    history.replaceState(null, "", "#sounds");
+    renderSoundCats();
+    renderSounds();
+    return;
+  }
+  soundView.classList.add("hidden");
+  libraryView.classList.remove("hidden");
   activeCategory = "All";
   searchEl.value = "";
   searchEl.placeholder = name === "proxies" ? "Search proxies..." : "Search games...";
@@ -136,10 +207,12 @@ function openGame(item) {
   playerView.classList.remove("hidden");
   location.hash = (currentTab === "proxies" ? "proxy-" : "") + item.id;
   window.scrollTo(0, 0);
+  window.dispatchEvent(new CustomEvent("mg:open", { detail: { id: currentTab + ":" + item.id } }));
 }
 
 function closeGame() {
   frame.src = "about:blank"; // stops the game & its sound
+  window.dispatchEvent(new Event("mg:close"));
   playerView.classList.add("hidden");
   libraryView.classList.remove("hidden");
   history.replaceState(null, "", currentTab === "proxies" ? "#proxies" : location.pathname);
@@ -147,7 +220,7 @@ function closeGame() {
 
 function openFromHash() {
   const h = decodeURIComponent(location.hash.slice(1));
-  if (!h || h === "proxies") return false;
+  if (!h || h === "proxies" || h === "sounds") return false;
   const isProxy = h.startsWith("proxy-");
   const name = isProxy ? "proxies" : "games";
   const id = isProxy ? h.slice(6) : h;
@@ -164,7 +237,7 @@ let exploding = false;
 function explodeThenOpen(card, game) {
   if (exploding) return;
   exploding = true;
-  playBoom();
+  playExplosionSound();
 
   const rect = card.getBoundingClientRect();
   const size = Math.max(rect.width, rect.height) * 1.8;
@@ -242,6 +315,18 @@ function explodeThenOpen(card, game) {
   requestAnimationFrame(frame);
 }
 
+// Deltarune explosion sound (falls back to the made-up boom if it can't play)
+const explosionSound = new Audio("sounds/deltarune-explosion.mp3");
+explosionSound.preload = "auto";
+function playExplosionSound() {
+  try {
+    const s = explosionSound.cloneNode();
+    s.volume = 0.8;
+    const p = s.play();
+    if (p && p.catch) p.catch(() => playBoom());
+  } catch (e) { playBoom(); }
+}
+
 // Short retro "boom" made in the browser (no sound file needed)
 let audioCtx;
 function playBoom() {
@@ -282,6 +367,7 @@ function playBoom() {
 
 // Events
 searchEl.addEventListener("input", () => {
+  if (currentTab === "sounds") return renderSounds();
   if (!playerView.classList.contains("hidden")) closeGame();
   renderGrid();
 });
@@ -303,56 +389,3 @@ document.querySelectorAll(".tab").forEach((t) => {
 });
 
 loadAll();
-
-// ===== Falling :3 particles =====
-(function () {
-  const canvas = document.getElementById("particles");
-  const ctx = canvas.getContext("2d");
-  const COUNT = 45;
-  let w, h, parts = [];
-
-  function resize() {
-    w = canvas.width = window.innerWidth;
-    h = canvas.height = window.innerHeight;
-  }
-
-  function makePart(startAnywhere) {
-    return {
-      x: Math.random() * w,
-      y: startAnywhere ? Math.random() * h : -30,
-      size: 12 + Math.random() * 14,
-      speed: 0.4 + Math.random() * 1.1,
-      drift: Math.random() * Math.PI * 2,
-      spin: (Math.random() - 0.5) * 0.02,
-      angle: (Math.random() - 0.5) * 0.6,
-      alpha: 0.45 + Math.random() * 0.45
-    };
-  }
-
-  function tick() {
-    ctx.clearRect(0, 0, w, h);
-    for (const p of parts) {
-      p.y += p.speed;
-      p.drift += 0.01;
-      p.x += Math.sin(p.drift) * 0.4;
-      p.angle += p.spin;
-      if (p.y > h + 30) Object.assign(p, makePart(false));
-
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.angle);
-      ctx.globalAlpha = p.alpha;
-      ctx.font = `bold ${p.size}px system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(":3", 0, 0);
-      ctx.restore();
-    }
-    requestAnimationFrame(tick);
-  }
-
-  resize();
-  parts = Array.from({ length: COUNT }, () => makePart(true));
-  window.addEventListener("resize", resize);
-  tick();
-})();
